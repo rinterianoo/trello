@@ -249,7 +249,18 @@ describe('Dashboard', () => {
     assert.equal(d.total, 7);
     assert.equal(d.completadas, 2);
     assert.equal(d.enProgreso, 3);
-    assert.equal(d.vencidas, 1);
+    // Las fechas del seed son relativas al día en que se cargó: con el paso de los días
+    // vencen más tareas. Se calcula el valor esperado con la definición de "vencida".
+    const ahora = new Date();
+    const tareas = await prisma.tarea.findMany({
+      where: { columna: { tablero: { proyectoId: SEED.proyectoId } } },
+      include: { columna: true },
+    });
+    const esperadas = tareas.filter((t) => t.fechaLimite && t.fechaLimite < ahora && t.columna.tipo !== 'COMPLETADO');
+    assert.equal(d.vencidas, esperadas.length);
+    assert.ok(d.vencidas >= 1, 'el seed incluye al menos una tarea vencida');
+    // La tarea completada con fecha límite pasada nunca cuenta como vencida
+    assert.ok(!esperadas.some((t) => t.id === SEED.tareas.completada));
   });
 
   test('un no miembro no ve el dashboard; proyecto inexistente es 404', async () => {
